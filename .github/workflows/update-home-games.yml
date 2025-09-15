@@ -2,7 +2,7 @@ name: Update Home Games
 
 on:
   schedule:
-    - cron: '0 11 * * *'  # Runs daily at 7:00 AM Eastern Time
+    - cron: '0 11 * * *'  # 7:00 AM Eastern Time
   workflow_dispatch:
 
 jobs:
@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repo with write access
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GH_PAT }}
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -25,16 +27,9 @@ jobs:
         run: python generate_homegames.py
 
       - name: Commit and push updated HTML
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-
-          # Replace the default remote with token-authenticated remote
-          git remote remove origin
-          git remote add origin https://x-access-token:${GH_PAT}@github.com/dbm1982/HAYSA-Home-Games.git
-
           git add index.html travel.html
           git diff --cached --quiet || git commit -m "Auto-update home games for $(date +'%Y-%m-%d')"
-          git push origin HEAD:main
+          git push
