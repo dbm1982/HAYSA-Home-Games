@@ -31,11 +31,13 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Pull latest changes
-        run: git pull origin main --rebase
-
-      - name: Commit and push updated HTML
+      - name: Commit changes
         run: |
           git add index.html travel.html
           git diff --cached --quiet || git commit -m "Auto-update home games for $(date +'%Y-%m-%d')"
-          git push
+
+      - name: Pull latest changes
+        run: git pull origin main --rebase
+
+      - name: Push changes
+        run: git push origin main
