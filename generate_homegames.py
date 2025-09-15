@@ -4,7 +4,15 @@ from datetime import datetime, timedelta
 import ssl
 from collections import defaultdict
 import subprocess
+import pytz
 
+
+# --- Eastern Time ---
+def to_eastern(dt):
+    eastern = pytz.timezone('US/Eastern')
+    if dt.tzinfo is None:
+        dt = pytz.utc.localize(dt)
+    return dt.astimezone(eastern)
 
 # --- iCal Feed ---
 ical_url = "http://tmsdln.com/19hyx"
@@ -68,7 +76,7 @@ opponent_crests = {
 }
 
 # --- Date Filtering ---
-today = datetime.now()
+today = to_eastern(datetime.utcnow())
 this_monday = today - timedelta(days=today.weekday())
 this_sunday = this_monday + timedelta(days=6)
 
@@ -78,7 +86,7 @@ games_by_day = defaultdict(list)
 for event in calendar.events:
     if "vs." in event.name or "@" in event.name:
         location = event.location or ""
-        start = event.begin.to("local").datetime
+        start = to_eastern(event.begin.datetime)
         if not (this_monday.date() <= start.date() <= this_sunday.date()):
             continue
 
@@ -127,7 +135,7 @@ home_games_by_day = defaultdict(list)
 for event in calendar.events:
     if "vs." in event.name or "@" in event.name:
         location = event.location or ""
-        start = event.begin.to("local").datetime
+        start = to_eastern(event.begin.datetime)
         if not (this_monday.date() <= start.date() <= this_sunday.date()):
             continue
 
@@ -209,7 +217,7 @@ with open("index.html", "w", encoding="utf-8") as f:
             f.write(f"<li><strong>{game['time']}</strong> – {crest_html}{game['team']} vs. {game['opponent']}{opponent_crest_html} – <span style='color:#0057a0;'>{game['normalized_location']}</span></li>")
         f.write("</ul></div>")
 
-    timestamp = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+    timestamp = to_eastern(datetime.utcnow()).strftime("%A, %B %d, %Y at %I:%M %p %Z")
     f.write(f"<p class='timestamp'>Last updated: {timestamp}</p>")
     f.write("""
     <script>
@@ -288,7 +296,7 @@ with open("travel.html", "w", encoding="utf-8") as f:
 
 
     # Write timestamp and close HTML
-    timestamp = datetime.now().strftime("%A, %B %d, %Y")
+    timestamp = to_eastern(datetime.utcnow()).strftime("%A, %B %d, %Y at %I:%M %p %Z")
     f.write(f"<p class='timestamp'>As of: {timestamp}</p>")
     f.write("</body></html>")
 
@@ -298,3 +306,4 @@ subprocess.run(["git", "commit", "-m", "Auto-update weekly schedule"])
 subprocess.run(["git", "push", "origin", "main"])
 
 print("Code completed.\n'index.html' file updated.\n'travel.html' file updated.")
+
