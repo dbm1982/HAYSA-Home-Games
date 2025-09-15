@@ -2,8 +2,8 @@ name: Update Home Games
 
 on:
   schedule:
-    - cron: '0 11 * * *'  # 7:00 AM Eastern Time (EDT = UTC-4)
-  workflow_dispatch:      # Optional: lets you trigger manually
+    - cron: '0 11 * * *'  # 7:00 AM Eastern Time
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,7 +22,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run Python script
-        run: python generate_home_games.py
+        run: python generate_home_games.py  # <-- Adjust this path if needed
 
       - name: Commit and push updated HTML
         run: |
