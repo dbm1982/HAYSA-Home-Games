@@ -116,6 +116,12 @@ for event in calendar.events:
         else:
             continue  # Skip non-HAYSA games
 
+        # Override is_home if location contradicts it
+        if is_home and not is_home_game(location):
+            is_home = False
+        elif not is_home and is_home_game(location):
+            is_home = True
+
         games_by_day[date_label].append({
             "team": hay_team,
             "opponent": opponent,
@@ -306,4 +312,5 @@ subprocess.run(["git", "commit", "-m", "Auto-update weekly schedule"])
 subprocess.run(["git", "push", "origin", "main"])
 
 print("Code completed.\n'index.html' file updated.\n'travel.html' file updated.")
+
 
