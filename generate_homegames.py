@@ -82,6 +82,7 @@ this_sunday = this_monday + timedelta(days=6)
 
 # --- Parse Events ---
 games_by_day = defaultdict(list)
+home_games_by_day = defaultdict(list)
 
 for event in calendar.events:
     if "vs." in event.name or "@" in event.name:
@@ -122,7 +123,7 @@ for event in calendar.events:
         elif not is_home and is_home_game(location):
             is_home = True
 
-        games_by_day[date_label].append({
+        game = {
             "team": hay_team,
             "opponent": opponent,
             "location": location.strip(),
@@ -130,7 +131,11 @@ for event in calendar.events:
             "is_home": is_home,
             "normalized_location": normalize_field_name(location),
             "crest": opponent_crests.get(opponent.upper(), "")
-        })
+        }
+
+        games_by_day[date_label].append(game)
+        if is_home:
+            home_games_by_day[date_label].append(game)
 
 # [imports, iCal fetch, field matching, crest mapping, and parsing logic remain unchanged]
 
@@ -298,6 +303,7 @@ subprocess.run(["git", "commit", "-m", "Auto-update weekly schedule"])
 subprocess.run(["git", "push", "origin", "main"])
 
 print("Code completed.\n'index.html' file updated.\n'travel.html' file updated.")
+
 
 
 
