@@ -139,43 +139,6 @@ for event in calendar.events:
 
 # [imports, iCal fetch, field matching, crest mapping, and parsing logic remain unchanged]
 
-        # Split matchup
-        if "vs." in event.name:
-            left, right = event.name.split("vs.")
-        elif "@" in event.name:
-            left, right = event.name.split("@")
-        else:
-            continue
-
-        left = left.strip()
-        right = right.strip()
-
-        # Determine HAYSA team
-        if left.startswith(("3/4", "5/6", "7/8")):
-            hay_team = left
-            opponent = right
-            is_home = True
-        elif right.startswith(("3/4", "5/6", "7/8")):
-            hay_team = right
-            opponent = left
-            is_home = False
-        else:
-            continue
-
-        game = {
-            "team": hay_team,
-            "opponent": opponent,
-            "location": location.strip(),
-            "time": time,
-            "is_home": is_home,
-            "normalized_location": normalize_field_name(location),
-            "crest": opponent_crests.get(opponent.upper(), "")
-        }
-
-        games_by_day[date_label].append(game)
-        if is_home:
-            home_games_by_day[date_label].append(game)
-
 # --- Generate index.html (Home Games Only) ---
 with open("index.html", "w", encoding="utf-8") as f:
     f.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>HAYSA Home Games</title>")
@@ -303,6 +266,7 @@ subprocess.run(["git", "commit", "-m", "Auto-update weekly schedule"])
 subprocess.run(["git", "push", "origin", "main"])
 
 print("Code completed.\n'index.html' file updated.\n'travel.html' file updated.")
+
 
 
 
