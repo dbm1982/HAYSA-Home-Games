@@ -134,20 +134,6 @@ for event in calendar.events:
 
 # [imports, iCal fetch, field matching, crest mapping, and parsing logic remain unchanged]
 
-# --- Split games by day ---
-games_by_day = defaultdict(list)
-home_games_by_day = defaultdict(list)
-
-for event in calendar.events:
-    if "vs." in event.name or "@" in event.name:
-        location = event.location or ""
-        start = to_eastern(event.begin.datetime)
-        if not (this_monday.date() <= start.date() <= this_sunday.date()):
-            continue
-
-        time = start.strftime("%I:%M %p").lstrip("0")
-        date_label = start.strftime("%A, %b %d")
-
         # Split matchup
         if "vs." in event.name:
             left, right = event.name.split("vs.")
@@ -312,5 +298,6 @@ subprocess.run(["git", "commit", "-m", "Auto-update weekly schedule"])
 subprocess.run(["git", "push", "origin", "main"])
 
 print("Code completed.\n'index.html' file updated.\n'travel.html' file updated.")
+
 
 
