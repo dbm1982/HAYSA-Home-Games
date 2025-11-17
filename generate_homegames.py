@@ -165,7 +165,7 @@ with open("index.html", "w", encoding="utf-8") as f:
 
     f.write("""
     <div class="club-message">
-      <p>Looking for a quick sideline stop this week? These games are happening right here in Holbrook—bring a chair, grab a coffee, and help make the sidelines feel like home!</p>
+      <p>Looking for a quick sideline stop this week? These games are happening right here in Holbrook—bring a chair, grab a coffee, and help make the sidelines feel like home!</p>  <p>If you don't see any games below, it just means that there are none this week!</p>
     </div>
     """)
 
@@ -222,7 +222,7 @@ with open("travel.html", "w", encoding="utf-8") as f:
 
     f.write("""
     <div class="club-message">
-      <p>From Holbrook to every corner of the South Shore, our teams are out there giving it their all. This is your full travel schedule for the week—home and away.</p>
+      <p>From Holbrook to every corner of the South Shore, our teams are out there giving it their all. This is your full travel schedule for the week—home and away.<p>If you don't see any games below, it just means that there are none this week!</p></p>
     </div>
     """)
 
@@ -266,6 +266,7 @@ subprocess.run(["git", "commit", "-m", "Auto-update weekly schedule"])
 subprocess.run(["git", "push", "origin", "main"])
 
 print("Code completed.\n'index.html' file updated.\n'travel.html' file updated.")
+
 
 
 
