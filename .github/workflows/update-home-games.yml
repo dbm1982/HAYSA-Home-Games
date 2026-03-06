@@ -1,8 +1,11 @@
 name: Update Home Games
 
+permissions:
+  contents: write
+
 on:
   schedule:
-    - cron: '0 11 * * *'  # 7:00 AM Eastern Time
+    - cron: '0 11 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,7 +16,8 @@ jobs:
       - name: Checkout repo with write access
         uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
