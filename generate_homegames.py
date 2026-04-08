@@ -14,10 +14,10 @@ def to_eastern(dt):
         dt = pytz.utc.localize(dt)
     return dt.astimezone(eastern)
 
-# --- iCal Feed (with cache-busting + browser user-agent) ---
+# --- iCal Feed (browser user-agent only, NO cache-busting) ---
 ssl._create_default_https_context = ssl._create_unverified_context
 
-ical_url = f"http://tmsdln.com/19hyx?ts={int(time.time())}"
+ical_url = "http://tmsdln.com/19hyx"
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 }
@@ -25,6 +25,13 @@ headers = {
 response = requests.get(ical_url, headers=headers)
 response.raise_for_status()
 calendar_data = response.text
+
+# --- DEBUG: Dump ICS feed so we can see what GitHub Actions is receiving ---
+with open("ics_dump.txt", "w", encoding="utf-8") as dump:
+    dump.write(calendar_data)
+
+calendar = Calendar(calendar_data)
+
 
 # --- DEBUG: Dump ICS feed so we can see what GitHub Actions is receiving ---
 with open("ics_dump.txt", "w", encoding="utf-8") as dump:
