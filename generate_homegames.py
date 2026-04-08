@@ -1,0 +1,169 @@
+import requests
+from ics import Calendar
+from datetime import datetime, timedelta
+import ssl
+from collections import defaultdict
+import pytz
+import re
+
+# --- Timezone helpers ---
+def to_eastern(dt):
+    eastern = pytz.timezone('US/Eastern')
+    if dt.tzinfo is None:
+        dt = pytz.utc.localize(dt)
+    return dt.astimezone(eastern)
+
+# --- iCal Feed ---
+ical_url = "http://tmsdln.com/19hyx"
+ssl._create_default_https_context = ssl._create_unverified_context
+calendar_data = requests.get(ical_url).text
+
+# --- DEBUG: Dump ICS feed so we can see what GitHub Actions is receiving ---
+with open("ics_dump.txt", "w", encoding="utf-8") as dump:
+    dump.write(calendar_data)
+
+calendar = Calendar(calendar_data)
+
+# --- Field normalization (display only) ---
+field_name_map = {
+    "H-HST": "Holbrook High School",
+    "Holbrook HS": "Holbrook High School",
+    "Holbrook High School": "Holbrook High School",
+    "143 S Franklin St": "Holbrook High School",
+    "143 South Franklin Street": "Holbrook High School",
+    "Sean Joyce Field": "Sean Joyce Field",
+    "Sumner Field": "Sean Joyce Field",
+    "Holbrook Playground": "Sean Joyce Field",
+    "H-SJ4": "Sean Joyce Field",
+}
+
+def normalize_field_name(location):
+    loc = (location or "").strip()
+    for alias, name in field_name_map.items():
+        if alias.lower() in loc.lower():
+            return name
+    return loc
+
+# --- Crest Mapping ---
+hayasa_crest = "https://d2jqoimos5um40.cloudfront.net/site_1563/162dca.png"
+opponent_crests = {
+    "ABINGTON": "https://static.wixstatic.com/media/97261c_54471fdb634c4d3fa113fe951de314ef~mv2.png/v1/fill/w_174,h_204,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/97261c_54471fdb634c4d3fa113fe951de314ef~mv2.png",
+    "ACUSHNET": "https://nebula.wsimg.com/d34af03927e1352f5052348865f537ac?AccessKeyId=8C796AAE797710F94A84&disposition=0&alloworigin=1",
+    "BRAINTREE": "https://tse4.mm.bing.net/th/id/OIP.8mgnbl-_HFeJrpvFPBck9AHaHa?pid=Api&P=0&h=180",
+    "BRIDGEWATER": "https://www.bridgewateryouthsoccer.com/Portals/4899/logo/logo636223303834986882.png",
+    "COHASSET": "https://tse3.mm.bing.net/th/id/OIP.GGHkIzybTl-3dbqcY51nVAHaJj?pid=Api&P=0&h=180",
+    "EAST BRIDGEWATER": "https://www.ebysa.com/Portals/57/EBYSA%20Web%20Heading%20Narrow%20Large.png?ver=Pw7zgypKOiIftXloW6Hg0w%3d%3d",
+    "EASTON": "https://cdn1.sportngin.com/attachments/call_to_action/4dc7-210934873/EYSL_Ball_large.png",
+    "HANSON": "https://whitmanhansonyouthsoccer.org/Portals/19/image001.png?ver=MY_OEzOjTRl4maigQFKbVg%3d%3d",
+    "WHITMAN-HANSON": "https://whitmanhansonyouthsoccer.org/Portals/19/image001.png?ver=MY_OEzOjTRl4maigQFKbVg%3d%3d",
+    "MARSHFIELD": "https://www.marshfieldsoccer.com/wp-content/uploads/sites/678/2022/05/MYS_Full_Color_Black_White_LizardNeonGreen.png",
+    "MMR": "https://www.marionma.gov/ImageRepository/Document?documentID=72",
+    "MIDDLEBORO": "https://images.squarespace-cdn.com/content/v1/5592f956e4b0d217906ce58b/1530823172680-BO9CXY334H3TYWM0M1A6/logo.png?format=1500w",
+    "PLYMOUTH": "https://nebula.wsimg.com/78a7bc57d1d03265f333a66707a25638?AccessKeyId=63688D9BB3B532ACAA07&disposition=0&alloworigin=1",
+    "QUINCY": "https://tse2.mm.bing.net/th/id/OIP.CZdNrzdApKNlAj0QhyKmVAAAAA?pid=Api&P=0&h=180",
+    "RANDOLPH": "https://www.wegotsoccer.com/mmWGS/team/randolph/randolph-logo.png",
+    "RAYNHAM": "https://raynhamsoccer.com/wp-content/uploads/2023/02/RAYNHAM-LOGO.png",
+    "ROCKLAND": "https://tse1.mm.bing.net/th/id/OIP.624YgOq0bVdVkfJOolTAmgAAAA?pid=Api&P=0&h=180",
+    "SHARON": "https://images.squarespace-cdn.com/content/v1/66a28a811406ea11d1e561df/4f0e039a-9230-4471-982b-0e549d47727d/SSA_Logo_Transparent.png?format=1500w",
+    "SILVER LAKE": "https://image.maxpreps.io/school-mascot/a/3/d/a3d4d72f-2659-4933-9947-94149c2a5b0b.gif?version=635801467800000000&width=128&height=128&auto=webp&format=pjpg",
+    "STOUGHTON": "https://stoughtonsoccer.org/Portals/68/logo_transparent.png?ver=2021-09-08-100316-333",
+    "WEST BRIDGEWATER": "https://www.wbyaa.com/Portals/52208/logo638573245926682379.png",
+    "WEYMOUTH": "https://weymouthsite.sportspilot.com/portals/47/Images/WYS%20Logo_small.jpg",
+}
+
+# --- Travel / Rec detection patterns ---
+HOLBROOK_TRAVEL_PATTERN = re.compile(r'^\d+.*(Boys|Girls).*$')
+OPPONENT_PATTERN = re.compile(r'^[A-Z][A-Z \-]+$')
+
+def is_holbrook_travel_team(text: str) -> bool:
+    return bool(HOLBROOK_TRAVEL_PATTERN.match(text.strip()))
+
+def is_travel_opponent(text: str) -> bool:
+    return bool(OPPONENT_PATTERN.match(text.strip()))
+
+# --- Date Filtering (this week: Monday–Sunday, Eastern) ---
+today = to_eastern(datetime.utcnow())
+this_monday = today - timedelta(days=today.weekday())
+this_sunday = this_monday + timedelta(days=6)
+
+# --- Parse Events ---
+games_by_day = defaultdict(list)
+home_games_by_day = defaultdict(list)
+
+
+
+for event in calendar.events:
+    name = event.name or ""
+    if "practice" in name.lower():
+        continue
+
+    start = to_eastern(event.begin.datetime)
+    if not (this_monday.date() <= start.date() <= this_sunday.date()):
+        continue
+
+    location = event.location or ""
+    time_str = start.strftime("%I:%M %p").lstrip("0")
+    date_label = start.strftime("%A, %b %d")
+
+    # Determine separator
+    if "vs." in name:
+        separator = "vs."
+        left, right = name.split("vs.", 1)
+    elif "@" in name:
+        separator = "@"
+        left, right = name.split("@", 1)
+    else:
+        continue
+
+    left = left.strip()
+    right = right.strip()
+
+    # Travel detection
+    left_is_holbrook = is_holbrook_travel_team(left)
+    right_is_holbrook = is_holbrook_travel_team(right)
+    left_is_opponent = is_travel_opponent(left)
+    right_is_opponent = is_travel_opponent(right)
+
+    # Travel game logic
+    is_travel = (
+        (left_is_holbrook and right_is_opponent) or
+        (right_is_holbrook and left_is_opponent) or
+        (left_is_holbrook and right_is_holbrook)
+    )
+
+    if not is_travel:
+        continue
+
+    # Determine home/away
+    if separator == "vs.":
+        is_home = left_is_holbrook
+    else:
+        is_home = right_is_holbrook
+
+    # Assign Holbrook team + opponent
+    if left_is_holbrook:
+        hay_team = left
+        opponent = right
+    else:
+        hay_team = right
+        opponent = left
+
+    opponent_clean = opponent.strip()
+    crest = opponent_crests.get(opponent_clean.upper(), "")
+
+    game = {
+        "team": hay_team,
+        "opponent": opponent_clean,
+        "location": location.strip(),
+        "time": time_str,
+        "is_home": is_home,
+        "normalized_location": normalize_field_name(location),
+        "crest": crest,
+    }
+
+    games_by_day[date_label].append(game)
+
+    if is_home:
+        home_games_by_day[date_label].append(game)
+
+
