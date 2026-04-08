@@ -5,6 +5,7 @@ import ssl
 from collections import defaultdict
 import pytz
 import re
+import time
 
 # --- Timezone helpers ---
 def to_eastern(dt):
@@ -13,10 +14,17 @@ def to_eastern(dt):
         dt = pytz.utc.localize(dt)
     return dt.astimezone(eastern)
 
-# --- iCal Feed ---
-ical_url = "http://tmsdln.com/19hyx"
+# --- iCal Feed (with cache-busting + browser user-agent) ---
 ssl._create_default_https_context = ssl._create_unverified_context
-calendar_data = requests.get(ical_url).text
+
+ical_url = f"http://tmsdln.com/19hyx?ts={int(time.time())}"
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+}
+
+response = requests.get(ical_url, headers=headers)
+response.raise_for_status()
+calendar_data = response.text
 
 # --- DEBUG: Dump ICS feed so we can see what GitHub Actions is receiving ---
 with open("ics_dump.txt", "w", encoding="utf-8") as dump:
