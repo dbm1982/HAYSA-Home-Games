@@ -97,7 +97,7 @@ def is_travel_opponent(text: str) -> bool:
     return bool(OPPONENT_PATTERN.match(text.strip()))
 
 # --- Date Filtering (this week: Monday–Sunday, Eastern) ---
-today = to_eastern(datetime.utcnow())
+today = datetime.now(pytz.timezone("US/Eastern"))
 this_monday = today - timedelta(days=today.weekday())
 this_sunday = this_monday + timedelta(days=6)
 
