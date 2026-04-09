@@ -6,42 +6,55 @@ from collections import defaultdict
 import pytz
 import re
 
-# --- Timezone helpers ---
+# ---------------------------------------------------------
+# TIMEZONE HELPERS
+# ---------------------------------------------------------
+
 def to_eastern(dt):
-    eastern = pytz.timezone('US/Eastern')
+    eastern = pytz.timezone("US/Eastern")
     if dt.tzinfo is None:
         dt = pytz.utc.localize(dt)
     return dt.astimezone(eastern)
 
-# --- iCal Feed (browser user-agent only, NO cache-busting) ---
+
+# ---------------------------------------------------------
+# ICS FETCH
+# ---------------------------------------------------------
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
-ical_url = "http://tmsdln.com/19hyx"
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
+ICAL_URL = "http://tmsdln.com/19hyx"
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-response = requests.get(ical_url, headers=headers)
+response = requests.get(ICAL_URL, headers=HEADERS)
 response.raise_for_status()
 calendar_data = response.text
 
-# --- DEBUG: Dump ICS feed so we can see what GitHub Actions is receiving ---
+# Dump ICS for debugging
 with open("ics_dump.txt", "w", encoding="utf-8") as dump:
     dump.write(calendar_data)
 
 calendar = Calendar(calendar_data)
 
-# --- Field normalization (display only) ---
+
+# ---------------------------------------------------------
+# FIELD NORMALIZATION
+# ---------------------------------------------------------
+
 field_name_map = {
     "H-HST": "Holbrook High School",
     "Holbrook HS": "Holbrook High School",
     "Holbrook High School": "Holbrook High School",
     "143 S Franklin St": "Holbrook High School",
     "143 South Franklin Street": "Holbrook High School",
+
     "Sean Joyce Field": "Sean Joyce Field",
     "Sumner Field": "Sean Joyce Field",
     "Holbrook Playground": "Sean Joyce Field",
     "H-SJ4": "Sean Joyce Field",
+
+    "A-BU1": "Avon Butler Elementary School",
+    "Avon Butler Elementary School": "Avon Butler Elementary School",
 }
 
 def normalize_field_name(location):
@@ -51,8 +64,13 @@ def normalize_field_name(location):
             return name
     return loc
 
-# --- Crest Mapping ---
+
+# ---------------------------------------------------------
+# CREST MAPPING
+# ---------------------------------------------------------
+
 hayasa_crest = "https://d2jqoimos5um40.cloudfront.net/site_1563/162dca.png"
+
 opponent_crests = {
     "ABINGTON": "https://static.wixstatic.com/media/97261c_54471fdb634c4d3fa113fe951de314ef~mv2.png",
     "ACUSHNET": "https://nebula.wsimg.com/d34af03927e1352f5052348865f537ac",
@@ -77,26 +95,37 @@ opponent_crests = {
     "WEYMOUTH": "https://weymouthsite.sportspilot.com/portals/47/Images/WYS%20Logo_small.jpg",
 }
 
-# --- Travel / Rec detection patterns ---
-# FIXED: This now matches ALL Holbrook travel teams (3/4, 5/6, 7/8, 9/10, 11/12/PG)
+
+# ---------------------------------------------------------
+# TRAVEL TEAM DETECTION
+# ---------------------------------------------------------
+
 HOLBROOK_TRAVEL_PATTERN = re.compile(
-    r'^\s*(\d+(/\d+)?(/PG)?)\s+(Boys|Girls)\b', re.IGNORECASE
+    r"^\s*(\d+(/\d+)?(/PG)?)\s+(Boys|Girls)\b", re.IGNORECASE
 )
 
-OPPONENT_PATTERN = re.compile(r'^[A-Z][A-Z \-]+$')
+OPPONENT_PATTERN = re.compile(r"^[A-Z][A-Z \-]+$")
 
-def is_holbrook_travel_team(text: str) -> bool:
+def is_holbrook_travel_team(text):
     return bool(HOLBROOK_TRAVEL_PATTERN.match(text.strip()))
 
-def is_travel_opponent(text: str) -> bool:
+def is_travel_opponent(text):
     return bool(OPPONENT_PATTERN.match(text.strip()))
 
-# --- Date Filtering (this week: Monday–Sunday, Eastern) ---
+
+# ---------------------------------------------------------
+# WEEK FILTERING (MON–SUN)
+# ---------------------------------------------------------
+
 today = datetime.now(pytz.timezone("US/Eastern"))
 this_monday = today - timedelta(days=today.weekday())
 this_sunday = this_monday + timedelta(days=6)
 
-# --- Parse Events ---
+
+# ---------------------------------------------------------
+# PARSE EVENTS
+# ---------------------------------------------------------
+
 games_by_day = defaultdict(list)
 home_games_by_day = defaultdict(list)
 
@@ -127,16 +156,15 @@ for event in calendar.events:
     right = right.strip()
 
     # Travel detection
-    left_is_holbrook = is_holbrook_travel_team(left)
-    right_is_holbrook = is_holbrook_travel_team(right)
-    left_is_opponent = is_travel_opponent(left)
-    right_is_opponent = is_travel_opponent(right)
+    left_is_hay = is_holbrook_travel_team(left)
+    right_is_hay = is_holbrook_travel_team(right)
+    left_is_opp = is_travel_opponent(left)
+    right_is_opp = is_travel_opponent(right)
 
-    # Travel game logic
     is_travel = (
-        (left_is_holbrook and right_is_opponent) or
-        (right_is_holbrook and left_is_opponent) or
-        (left_is_holbrook and right_is_holbrook)
+        (left_is_hay and right_is_opp) or
+        (right_is_hay and left_is_opp) or
+        (left_is_hay and right_is_hay)
     )
 
     if not is_travel:
@@ -144,12 +172,12 @@ for event in calendar.events:
 
     # Determine home/away
     if separator == "vs.":
-        is_home = left_is_holbrook
+        is_home = left_is_hay
     else:
-        is_home = right_is_holbrook
+        is_home = right_is_hay
 
     # Assign Holbrook team + opponent
-    if left_is_holbrook:
+    if left_is_hay:
         hay_team = left
         opponent = right
     else:
@@ -163,29 +191,32 @@ for event in calendar.events:
         "team": hay_team,
         "opponent": opponent_clean,
         "location": location.strip(),
+        "normalized_location": normalize_field_name(location),
         "time": time_str,
         "is_home": is_home,
-        "normalized_location": normalize_field_name(location),
         "crest": crest,
     }
 
     games_by_day[date_label].append(game)
-
     if is_home:
         home_games_by_day[date_label].append(game)
 
+
 # ---------------------------------------------------------
-# HTML GENERATION HELPERS
+# HTML HELPERS
 # ---------------------------------------------------------
 
 def html_escape(text):
     return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def build_home_html(home_games_by_day):
-    """Generate index.html showing ALL Holbrook home games (HS + Butler)."""
+# ---------------------------------------------------------
+# INDEX.HTML — HOME GAMES
+# ---------------------------------------------------------
 
+def build_home_html(home_games_by_day):
     html = []
+
     html.append("""
 <!DOCTYPE html><html><head><meta charset='UTF-8'><title>HAYSA Home Games</title>
 <style>
@@ -214,29 +245,30 @@ def build_home_html(home_games_by_day):
 </div>
 """)
 
-    # Sort days chronologically
+    # Sort days
     for date_label in sorted(home_games_by_day.keys(), key=lambda d: datetime.strptime(d, "%A, %b %d")):
         games = home_games_by_day[date_label]
 
         # Group by field
-        fields = {}
+        fields = defaultdict(list)
         for g in games:
-            fields.setdefault(g["normalized_location"], []).append(g)
+            fields[g["normalized_location"]].append(g)
 
         html.append(f"<div class='day-box'><h2>📅 {date_label}</h2>")
 
         for field, field_games in fields.items():
             html.append(f"<h3>🏟 {html_escape(field)}</h3><ul>")
+
             for g in sorted(field_games, key=lambda x: x["time"]):
-                crest_hay = hayasa_crest
-                crest_opp = g["crest"]
+                opp_img = f"<img src='{g['crest']}' class='crest'>" if g["crest"] else ""
                 html.append(
                     f"<li><strong>{g['time']}</strong> – "
-                    f"<img src='{crest_hay}' class='crest'>"
+                    f"<img src='{hayasa_crest}' class='crest'>"
                     f"{html_escape(g['team'])} vs. {html_escape(g['opponent'])}"
-                    f"{f'<img src=\"{crest_opp}\" class=\"crest\">' if crest_opp else ''}"
+                    f"{opp_img}"
                     f" – <span style='color:#0057a0;'>{html_escape(field)}</span></li>"
                 )
+
             html.append("</ul>")
 
         html.append("</div>")
@@ -247,10 +279,13 @@ def build_home_html(home_games_by_day):
     return "".join(html)
 
 
-def build_travel_html(games_by_day):
-    """Generate travel.html showing ALL travel games (home + away)."""
+# ---------------------------------------------------------
+# TRAVEL.HTML — FULL SCHEDULE
+# ---------------------------------------------------------
 
+def build_travel_html(games_by_day):
     html = []
+
     html.append("""
 <!DOCTYPE html><html><head><meta charset='UTF-8'><title>HAYSA Travel Schedule</title>
 <style>
@@ -283,7 +318,7 @@ def build_travel_html(games_by_day):
 </div>
 """)
 
-    # Sort days chronologically
+    # Sort days
     for date_label in sorted(games_by_day.keys(), key=lambda d: datetime.strptime(d, "%A, %b %d")):
         games = games_by_day[date_label]
 
@@ -295,13 +330,12 @@ def build_travel_html(games_by_day):
         # HOME BOX
         html.append("<div class='home-box'><h3>🏠 Home Games</h3><ul>")
         for g in sorted(home, key=lambda x: x["time"]):
-            crest_hay = hayasa_crest
-            crest_opp = g["crest"]
+            opp_img = f"<img src='{g['crest']}' class='crest'>" if g["crest"] else ""
             html.append(
                 f"<li><strong>{g['time']}</strong> – "
-                f"<img src='{crest_hay}' class='crest'>"
+                f"<img src='{hayasa_crest}' class='crest'>"
                 f"{html_escape(g['team'])} vs. {html_escape(g['opponent'])}"
-                f"{f'<img src=\"{crest_opp}\" class=\"crest\">' if crest_opp else ''}"
+                f"{opp_img}"
                 f" – {html_escape(g['location'])}</li>"
             )
         html.append("</ul></div>")
@@ -309,13 +343,12 @@ def build_travel_html(games_by_day):
         # AWAY BOX
         html.append("<div class='away-box'><h3>🚗 Away Games</h3><ul>")
         for g in sorted(away, key=lambda x: x["time"]):
-            crest_hay = hayasa_crest
-            crest_opp = g["crest"]
+            opp_img = f"<img src='{g['crest']}' class='crest'>" if g["crest"] else ""
             html.append(
                 f"<li><strong>{g['time']}</strong> – "
-                f"<img src='{crest_hay}' class='crest'>"
+                f"<img src='{hayasa_crest}' class='crest'>"
                 f"{html_escape(g['team'])} @ {html_escape(g['opponent'])}"
-                f"{f'<img src=\"{crest_opp}\" class=\"crest\">' if crest_opp else ''}"
+                f"{opp_img}"
                 f" – {html_escape(g['location'])}</li>"
             )
         html.append("</ul></div></div>")
@@ -327,7 +360,7 @@ def build_travel_html(games_by_day):
 
 
 # ---------------------------------------------------------
-# WRITE BOTH HTML FILES
+# WRITE OUTPUT FILES
 # ---------------------------------------------------------
 
 with open("index.html", "w", encoding="utf-8") as f:
@@ -335,5 +368,3 @@ with open("index.html", "w", encoding="utf-8") as f:
 
 with open("travel.html", "w", encoding="utf-8") as f:
     f.write(build_travel_html(games_by_day))
-
-
