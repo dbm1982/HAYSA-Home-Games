@@ -173,3 +173,167 @@ for event in calendar.events:
 
     if is_home:
         home_games_by_day[date_label].append(game)
+
+# ---------------------------------------------------------
+# HTML GENERATION HELPERS
+# ---------------------------------------------------------
+
+def html_escape(text):
+    return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def build_home_html(home_games_by_day):
+    """Generate index.html showing ALL Holbrook home games (HS + Butler)."""
+
+    html = []
+    html.append("""
+<!DOCTYPE html><html><head><meta charset='UTF-8'><title>HAYSA Home Games</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 1rem; background: #fcfcfc; }
+  .club-message {
+    background: #eef6fb; padding: 1rem; border-left: 4px solid #3498db;
+    border-radius: 8px; max-width: 900px; margin: 2em auto;
+  }
+  .day-box {
+    background: #eafaf1; border-left: 6px solid #27ae60;
+    border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    max-width: 900px; margin: 2em auto; padding: 1.5em;
+  }
+  h2 { text-align: center; font-size: 1.4em; margin-bottom: 0.5em; }
+  h3 { font-size: 1.2em; margin-bottom: 0.5em; color: #2c3e50; }
+  ul { list-style: none; padding: 0; font-size: 1.05em; }
+  li { margin-bottom: 1em; }
+  img.crest { height: 1em; vertical-align: middle; margin: 0 0.3em; }
+  .timestamp { text-align: center; font-size: 0.9em; color: #666; margin-top: 2rem; }
+</style>
+</head><body>
+
+<div class="club-message">
+  <p>Looking for a quick sideline stop this week? These games are happening right here in Holbrook—bring a chair, grab a coffee, and help make the sidelines feel like home!</p>
+  <p>If you don't see any games below, it just means that there are none this week!</p>
+</div>
+""")
+
+    # Sort days chronologically
+    for date_label in sorted(home_games_by_day.keys(), key=lambda d: datetime.strptime(d, "%A, %b %d")):
+        games = home_games_by_day[date_label]
+
+        # Group by field
+        fields = {}
+        for g in games:
+            fields.setdefault(g["normalized_location"], []).append(g)
+
+        html.append(f"<div class='day-box'><h2>📅 {date_label}</h2>")
+
+        for field, field_games in fields.items():
+            html.append(f"<h3>🏟 {html_escape(field)}</h3><ul>")
+            for g in sorted(field_games, key=lambda x: x["time"]):
+                crest_hay = hayasa_crest
+                crest_opp = g["crest"]
+                html.append(
+                    f"<li><strong>{g['time']}</strong> – "
+                    f"<img src='{crest_hay}' class='crest'>"
+                    f"{html_escape(g['team'])} vs. {html_escape(g['opponent'])}"
+                    f"{f'<img src=\"{crest_opp}\" class=\"crest\">' if crest_opp else ''}"
+                    f" – <span style='color:#0057a0;'>{html_escape(field)}</span></li>"
+                )
+            html.append("</ul>")
+
+        html.append("</div>")
+
+    timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%A, %B %d, %Y at %I:%M %p %Z")
+    html.append(f"<p class='timestamp'>Last updated: {timestamp}</p></body></html>")
+
+    return "".join(html)
+
+
+def build_travel_html(games_by_day):
+    """Generate travel.html showing ALL travel games (home + away)."""
+
+    html = []
+    html.append("""
+<!DOCTYPE html><html><head><meta charset='UTF-8'><title>HAYSA Travel Schedule</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 1rem; background: #fcfcfc; }
+  .club-message {
+    background: #fef9f4; padding: 1rem; border-left: 4px solid #d35400;
+    border-radius: 8px; max-width: 900px; margin: 2em auto;
+  }
+  .day-container {
+    display: flex; flex-wrap: wrap; gap: 2em; justify-content: center; margin-bottom: 1.5em;
+  }
+  .home-box, .away-box {
+    flex: 1 1 400px; background: #fff; border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06); padding: 1.5em; max-width: 500px;
+  }
+  .home-box { border-left: 6px solid #27ae60; background: #eafaf1; }
+  .away-box { border-left: 6px solid #c0392b; background: #fef4f0; }
+  h2 { text-align: center; font-size: 1.4em; margin-bottom: 0.5em; }
+  h3 { font-size: 1.2em; margin-bottom: 0.5em; color: #2c3e50; }
+  ul { list-style: none; padding: 0; font-size: 1.05em; }
+  li { margin-bottom: 1em; }
+  img.crest { height: 1em; vertical-align: middle; margin: 0 0.3em; }
+  .timestamp { text-align: center; font-size: 0.9em; color: #666; margin-top: 2rem; }
+</style>
+</head><body>
+
+<div class="club-message">
+  <p>From Holbrook to every corner of the South Shore, our teams are out there giving it their all. This is your full travel schedule for the week—home and away.</p>
+  <p>If you don't see any games below, it just means that there are none this week!</p>
+</div>
+""")
+
+    # Sort days chronologically
+    for date_label in sorted(games_by_day.keys(), key=lambda d: datetime.strptime(d, "%A, %b %d")):
+        games = games_by_day[date_label]
+
+        home = [g for g in games if g["is_home"]]
+        away = [g for g in games if not g["is_home"]]
+
+        html.append(f"<h2>📅 {date_label}</h2><div class='day-container'>")
+
+        # HOME BOX
+        html.append("<div class='home-box'><h3>🏠 Home Games</h3><ul>")
+        for g in sorted(home, key=lambda x: x["time"]):
+            crest_hay = hayasa_crest
+            crest_opp = g["crest"]
+            html.append(
+                f"<li><strong>{g['time']}</strong> – "
+                f"<img src='{crest_hay}' class='crest'>"
+                f"{html_escape(g['team'])} vs. {html_escape(g['opponent'])}"
+                f"{f'<img src=\"{crest_opp}\" class=\"crest\">' if crest_opp else ''}"
+                f" – {html_escape(g['location'])}</li>"
+            )
+        html.append("</ul></div>")
+
+        # AWAY BOX
+        html.append("<div class='away-box'><h3>🚗 Away Games</h3><ul>")
+        for g in sorted(away, key=lambda x: x["time"]):
+            crest_hay = hayasa_crest
+            crest_opp = g["crest"]
+            html.append(
+                f"<li><strong>{g['time']}</strong> – "
+                f"<img src='{crest_hay}' class='crest'>"
+                f"{html_escape(g['team'])} @ {html_escape(g['opponent'])}"
+                f"{f'<img src=\"{crest_opp}\" class=\"crest\">' if crest_opp else ''}"
+                f" – {html_escape(g['location'])}</li>"
+            )
+        html.append("</ul></div></div>")
+
+    timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%A, %B %d, %Y at %I:%M %p %Z")
+    html.append(f"<p class='timestamp'>As of: {timestamp}</p></body></html>")
+
+    return "".join(html)
+
+
+# ---------------------------------------------------------
+# WRITE BOTH HTML FILES
+# ---------------------------------------------------------
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(build_home_html(home_games_by_day))
+
+with open("travel.html", "w", encoding="utf-8") as f:
+    f.write(build_travel_html(games_by_day))
+
+
