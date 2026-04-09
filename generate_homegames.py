@@ -5,7 +5,6 @@ import ssl
 from collections import defaultdict
 import pytz
 import re
-import time
 
 # --- Timezone helpers ---
 def to_eastern(dt):
@@ -25,13 +24,6 @@ headers = {
 response = requests.get(ical_url, headers=headers)
 response.raise_for_status()
 calendar_data = response.text
-
-# --- DEBUG: Dump ICS feed so we can see what GitHub Actions is receiving ---
-with open("ics_dump.txt", "w", encoding="utf-8") as dump:
-    dump.write(calendar_data)
-
-calendar = Calendar(calendar_data)
-
 
 # --- DEBUG: Dump ICS feed so we can see what GitHub Actions is receiving ---
 with open("ics_dump.txt", "w", encoding="utf-8") as dump:
@@ -62,32 +54,35 @@ def normalize_field_name(location):
 # --- Crest Mapping ---
 hayasa_crest = "https://d2jqoimos5um40.cloudfront.net/site_1563/162dca.png"
 opponent_crests = {
-    "ABINGTON": "https://static.wixstatic.com/media/97261c_54471fdb634c4d3fa113fe951de314ef~mv2.png/v1/fill/w_174,h_204,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/97261c_54471fdb634c4d3fa113fe951de314ef~mv2.png",
-    "ACUSHNET": "https://nebula.wsimg.com/d34af03927e1352f5052348865f537ac?AccessKeyId=8C796AAE797710F94A84&disposition=0&alloworigin=1",
-    "BRAINTREE": "https://tse4.mm.bing.net/th/id/OIP.8mgnbl-_HFeJrpvFPBck9AHaHa?pid=Api&P=0&h=180",
+    "ABINGTON": "https://static.wixstatic.com/media/97261c_54471fdb634c4d3fa113fe951de314ef~mv2.png",
+    "ACUSHNET": "https://nebula.wsimg.com/d34af03927e1352f5052348865f537ac",
+    "BRAINTREE": "https://tse4.mm.bing.net/th/id/OIP.8mgnbl-_HFeJrpvFPBck9AHaHa",
     "BRIDGEWATER": "https://www.bridgewateryouthsoccer.com/Portals/4899/logo/logo636223303834986882.png",
-    "COHASSET": "https://tse3.mm.bing.net/th/id/OIP.GGHkIzybTl-3dbqcY51nVAHaJj?pid=Api&P=0&h=180",
-    "EAST BRIDGEWATER": "https://www.ebysa.com/Portals/57/EBYSA%20Web%20Heading%20Narrow%20Large.png?ver=Pw7zgypKOiIftXloW6Hg0w%3d%3d",
+    "COHASSET": "https://tse3.mm.bing.net/th/id/OIP.GGHkIzybTl-3dbqcY51nVAHaJj",
+    "EAST BRIDGEWATER": "https://www.ebysa.com/Portals/57/EBYSA%20Web%20Heading%20Narrow%20Large.png",
     "EASTON": "https://cdn1.sportngin.com/attachments/call_to_action/4dc7-210934873/EYSL_Ball_large.png",
-    "HANSON": "https://whitmanhansonyouthsoccer.org/Portals/19/image001.png?ver=MY_OEzOjTRl4maigQFKbVg%3d%3d",
-    "WHITMAN-HANSON": "https://whitmanhansonyouthsoccer.org/Portals/19/image001.png?ver=MY_OEzOjTRl4maigQFKbVg%3d%3d",
+    "HANSON": "https://whitmanhansonyouthsoccer.org/Portals/19/image001.png",
+    "WHITMAN-HANSON": "https://whitmanhansonyouthsoccer.org/Portals/19/image001.png",
     "MARSHFIELD": "https://www.marshfieldsoccer.com/wp-content/uploads/sites/678/2022/05/MYS_Full_Color_Black_White_LizardNeonGreen.png",
-    "MMR": "https://www.marionma.gov/ImageRepository/Document?documentID=72",
-    "MIDDLEBORO": "https://images.squarespace-cdn.com/content/v1/5592f956e4b0d217906ce58b/1530823172680-BO9CXY334H3TYWM0M1A6/logo.png?format=1500w",
-    "PLYMOUTH": "https://nebula.wsimg.com/78a7bc57d1d03265f333a66707a25638?AccessKeyId=63688D9BB3B532ACAA07&disposition=0&alloworigin=1",
-    "QUINCY": "https://tse2.mm.bing.net/th/id/OIP.CZdNrzdApKNlAj0QhyKmVAAAAA?pid=Api&P=0&h=180",
+    "MIDDLEBORO": "https://images.squarespace-cdn.com/content/v1/5592f956e4b0d217906ce58b/1530823172680-BO9CXY334H3TYWM0M1A6/logo.png",
+    "PLYMOUTH": "https://nebula.wsimg.com/78a7bc57d1d03265f333a66707a25638",
+    "QUINCY": "https://tse2.mm.bing.net/th/id/OIP.CZdNrzdApKNlAj0QhyKmVAAAAA",
     "RANDOLPH": "https://www.wegotsoccer.com/mmWGS/team/randolph/randolph-logo.png",
     "RAYNHAM": "https://raynhamsoccer.com/wp-content/uploads/2023/02/RAYNHAM-LOGO.png",
-    "ROCKLAND": "https://tse1.mm.bing.net/th/id/OIP.624YgOq0bVdVkfJOolTAmgAAAA?pid=Api&P=0&h=180",
-    "SHARON": "https://images.squarespace-cdn.com/content/v1/66a28a811406ea11d1e561df/4f0e039a-9230-4471-982b-0e549d47727d/SSA_Logo_Transparent.png?format=1500w",
-    "SILVER LAKE": "https://image.maxpreps.io/school-mascot/a/3/d/a3d4d72f-2659-4933-9947-94149c2a5b0b.gif?version=635801467800000000&width=128&height=128&auto=webp&format=pjpg",
-    "STOUGHTON": "https://stoughtonsoccer.org/Portals/68/logo_transparent.png?ver=2021-09-08-100316-333",
+    "ROCKLAND": "https://tse1.mm.bing.net/th/id/OIP.624YgOq0bVdVkfJOolTAmgAAAA",
+    "SHARON": "https://images.squarespace-cdn.com/content/v1/66a28a811406ea11d1e561df/4f0e039a-9230-4471-982b-0e549d47727d/SSA_Logo_Transparent.png",
+    "SILVER LAKE": "https://image.maxpreps.io/school-mascot/a/3/d/a3d4d72f-2659-4933-9947-94149c2a5b0b.gif",
+    "STOUGHTON": "https://stoughtonsoccer.org/Portals/68/logo_transparent.png",
     "WEST BRIDGEWATER": "https://www.wbyaa.com/Portals/52208/logo638573245926682379.png",
     "WEYMOUTH": "https://weymouthsite.sportspilot.com/portals/47/Images/WYS%20Logo_small.jpg",
 }
 
 # --- Travel / Rec detection patterns ---
-HOLBROOK_TRAVEL_PATTERN = re.compile(r'^\d+.*(Boys|Girls).*$')
+# FIXED: This now matches ALL Holbrook travel teams (3/4, 5/6, 7/8, 9/10, 11/12/PG)
+HOLBROOK_TRAVEL_PATTERN = re.compile(
+    r'^\s*(\d+(/\d+)?(/PG)?)\s+(Boys|Girls)\b', re.IGNORECASE
+)
+
 OPPONENT_PATTERN = re.compile(r'^[A-Z][A-Z \-]+$')
 
 def is_holbrook_travel_team(text: str) -> bool:
@@ -104,8 +99,6 @@ this_sunday = this_monday + timedelta(days=6)
 # --- Parse Events ---
 games_by_day = defaultdict(list)
 home_games_by_day = defaultdict(list)
-
-
 
 for event in calendar.events:
     name = event.name or ""
@@ -180,5 +173,3 @@ for event in calendar.events:
 
     if is_home:
         home_games_by_day[date_label].append(game)
-
-
