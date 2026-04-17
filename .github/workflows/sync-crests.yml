@@ -25,7 +25,6 @@ jobs:
 
       - name: Download crest mapping CSV
         run: |
-          # Replace with your actual published CSV URL
           CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRu2yQBMvIYVuK7f7SdHkRHbexYLTKRiQoGe0mHtb7QRHQWZc0ekbabhrbGn9gI02zBywIFNQjnon9h/pub?gid=0&single=true&output=csv"
           curl -L "$CSV_URL" -o crest_mapping.csv
 
@@ -33,6 +32,7 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
+          python << 'EOF'
           import os
           import csv
           import json
@@ -52,25 +52,26 @@ jobs:
 
           # Read CSV mapping
           with open("crest_mapping.csv", newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-              town = row.get("Town") or row.get("town") or row.get("TOWN")
-              file_id = row.get("FileID") or row.get("file_id") or row.get("FILEID")
+              reader = csv.DictReader(f)
+              for row in reader:
+                  town = row.get("Town") or row.get("town") or row.get("TOWN")
+                  file_id = row.get("FileID") or row.get("file_id") or row.get("FILEID")
 
-              if not town or not file_id:
-                continue
+                  if not town or not file_id:
+                      continue
 
-              town_slug = town.strip().replace(" ", "_").upper()
-              url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+                  town_slug = town.strip().replace(" ", "_").upper()
+                  url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
 
-              print(f"Downloading crest for {town} ({file_id})...")
-              resp = authed_session.get(url)
-              if resp.status_code == 200:
-                out_path = os.path.join(out_dir, f"{town_slug}.png")
-                with open(out_path, "wb") as img_f:
-                  img_f.write(resp.content)
-              else:
-                print(f"Failed to download {town}: {resp.status_code} {resp.text[:200]}")
+                  print(f"Downloading crest for {town} ({file_id})...")
+                  resp = authed_session.get(url)
+                  if resp.status_code == 200:
+                      out_path = os.path.join(out_dir, f"{town_slug}.png")
+                      with open(out_path, "wb") as img_f:
+                          img_f.write(resp.content)
+                  else:
+                      print(f"Failed to download {town}: {resp.status_code} {resp.text[:200]}")
+          EOF
 
       - name: Commit and push changes (if any)
         env:
@@ -83,7 +84,6 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No crest changes to commit."
-          else
+          else:
             git commit -m "Sync crest images from Google Drive"
             git push
-          fi
