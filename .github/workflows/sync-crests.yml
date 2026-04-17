@@ -1,89 +1,44 @@
-name: Sync crest images from Drive
-
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 9 * * *"  # 9:00 UTC daily – adjust as needed
-
-jobs:
-  sync-crests:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install google-auth google-auth-httplib2 google-api-python-client requests
-
-      - name: Download crest mapping CSV
-        run: |
-          CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRu2yQBMvIYVuK7f7SdHkRHbexYLTKRiQoGe0mHtb7QRHQWZc0ekbabhrbGn9gI02zBywIFNQjnon9h/pub?gid=0&single=true&output=csv"
-          curl -L "$CSV_URL" -o crest_mapping.csv
-
       - name: Sync crest PNGs from Drive
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
         run: |
           python << 'EOF'
-          import os
-          import csv
-          import json
-          import requests
-          from google.oauth2 import service_account
-          from google.auth.transport.requests import AuthorizedSession
+import os
+import csv
+import json
+import requests
+from google.oauth2 import service_account
+from google.auth.transport.requests import AuthorizedSession
 
-          # Load service account credentials from secret
-          sa_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
-          scopes = ["https://www.googleapis.com/auth/drive.readonly"]
-          creds = service_account.Credentials.from_service_account_info(sa_info, scopes=scopes)
-          authed_session = AuthorizedSession(creds)
+# Load service account credentials from secret
+sa_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
+scopes = ["https://www.googleapis.com/auth/drive.readonly"]
+creds = service_account.Credentials.from_service_account_info(sa_info, scopes=scopes)
+authed_session = AuthorizedSession(creds)
 
-          # Ensure output directory exists
-          out_dir = "assets/crests"
-          os.makedirs(out_dir, exist_ok=True)
+# Ensure output directory exists
+out_dir = "assets/crests"
+os.makedirs(out_dir, exist_ok=True)
 
-          # Read CSV mapping
-          with open("crest_mapping.csv", newline="", encoding="utf-8") as f:
-              reader = csv.DictReader(f)
-              for row in reader:
-                  town = row.get("Town") or row.get("town") or row.get("TOWN")
-                  file_id = row.get("FileID") or row.get("file_id") or row.get("FILEID")
+# Read CSV mapping
+with open("crest_mapping.csv", newline="", encoding="utf-8") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        town = row.get("Town") or row.get("town") or row.get("TOWN")
+        file_id = row.get("FileID") or row.get("file_id") or row.get("FILEID")
 
-                  if not town or not file_id:
-                      continue
+        if not town or not file_id:
+            continue
 
-                  town_slug = town.strip().replace(" ", "_").upper()
-                  url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+        town_slug = town.strip().replace(" ", "_").upper()
+        url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
 
-                  print(f"Downloading crest for {town} ({file_id})...")
-                  resp = authed_session.get(url)
-                  if resp.status_code == 200:
-                      out_path = os.path.join(out_dir, f"{town_slug}.png")
-                      with open(out_path, "wb") as img_f:
-                          img_f.write(resp.content)
-                  else:
-                      print(f"Failed to download {town}: {resp.status_code} {resp.text[:200]}")
-          EOF
-
-      - name: Commit and push changes (if any)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add assets/crests || true
-
-          if git diff --cached --quiet; then
-            echo "No crest changes to commit."
-          else:
-            git commit -m "Sync crest images from Google Drive"
-            git push
+        print(f"Downloading crest for {town} ({file_id})...")
+        resp = authed_session.get(url)
+        if resp.status_code == 200:
+            out_path = os.path.join(out_dir, f"{town_slug}.png")
+            with open(out_path, "wb") as img_f:
+                img_f.write(resp.content)
+        else:
+            print(f"Failed to download {town}: {resp.status_code} {resp.text[:200]}")
+EOF
