@@ -49,4 +49,3 @@ jobs:
             git commit -m "Sync crest images from Google Drive"
             git push
           fi
-D
