@@ -26,8 +26,7 @@ jobs:
       - name: Download crest mapping CSV
         run: |
           # Replace with your actual published CSV URL
-          CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRu2yQBMvIYVuK7f7SdHkRHbexYLTKRiQoGe0mHtb7QRHQWZc0ekbabhrbGn9gI02zBywIFNQjnon9h/pub?gid=0&single=true&output=csv
-"
+          CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRu2yQBMvIYVuK7f7SdHkRHbexYLTKRiQoGe0mHtb7QRHQWZc0ekbabhrbGn9gI02zBywIFNQjnon9h/pub?gid=0&single=true&output=csv"
           curl -L "$CSV_URL" -o crest_mapping.csv
 
       - name: Sync crest PNGs from Drive
