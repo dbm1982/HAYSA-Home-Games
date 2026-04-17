@@ -1,3 +1,4 @@
+import os
 import requests
 from ics import Calendar
 from datetime import datetime, timedelta
