@@ -255,7 +255,28 @@ def build_home_html(home_games_by_day):
         html.append("</div>")
 
     timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%A, %B %d, %Y at %I:%M %p %Z")
-    html.append(f"<p class='timestamp'>Last updated: {timestamp}</p></body></html>")
+    html.append(f"<p class='timestamp'>Last updated: {timestamp}</p>")
+
+    html.append("""
+    <script>
+      function sendHeight() {
+        const height = document.documentElement.scrollHeight;
+        parent.postMessage({ height: height }, "https://www.haysa.org");
+      }
+    
+      window.onload = sendHeight;
+      window.onresize = sendHeight;
+    
+      document.addEventListener("DOMContentLoaded", () => {
+        setTimeout(sendHeight, 300);
+        setTimeout(sendHeight, 1000);
+        setTimeout(sendHeight, 2000);
+      });
+    </script>
+    """)
+    
+    html.append("</body></html>")
+
 
     return "".join(html)
 
@@ -328,14 +349,34 @@ def build_travel_html(games_by_day):
             html.append(
                 f"<li><strong>{g['time']}</strong> – "
                 f"<img src='{hayasa_crest}' class='crest'>"
-                f"{html_escape(g['team'])} @ {html_escape(g['opponent'])}"
-                f"{opp_img}"
+                f"{html_escape(g['team'])} @ {html_escape[g['opponent']]}{opp_img}"
                 f" – {html_escape(g['location'])}</li>"
             )
         html.append("</ul></div></div>")
 
     timestamp = datetime.now(pytz.timezone("US/Eastern")).strftime("%A, %B %d, %Y at %I:%M %p %Z")
-    html.append(f"<p class='timestamp'>As of: {timestamp}</p></body></html>")
+    html.append(f"<p class='timestamp'>As of: {timestamp}</p>")
+
+    # ⭐ Seamless iframe auto-height script
+    html.append("""
+<script>
+  function sendHeight() {
+    const height = document.documentElement.scrollHeight;
+    parent.postMessage({ height: height }, "https://www.haysa.org");
+  }
+
+  window.onload = sendHeight;
+  window.onresize = sendHeight;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(sendHeight, 300);
+    setTimeout(sendHeight, 1000);
+    setTimeout(sendHeight, 2000);
+  });
+</script>
+""")
+
+    html.append("</body></html>")
 
     return "".join(html)
 
